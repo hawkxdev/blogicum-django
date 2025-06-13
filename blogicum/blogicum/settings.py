@@ -7,9 +7,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-!^)z_b6)8*6dez1+27r_#-4d@rt72r%#t&f(()+91zb=thr3)j'
 
 
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+]
 
 
 INSTALLED_APPS = [
@@ -22,6 +25,8 @@ INSTALLED_APPS = [
 
     'blog.apps.BlogConfig',
     'pages.apps.PagesConfig',
+
+    'django_bootstrap5',
 ]
 
 MIDDLEWARE = [
@@ -97,3 +102,5 @@ STATICFILES_DIRS = [
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CSRF_FAILURE_VIEW = 'pages.views.csrf_failure'
