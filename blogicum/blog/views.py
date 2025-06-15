@@ -52,24 +52,37 @@ def category_posts(request: HttpRequest, category_slug: str) -> HttpResponse:
         slug=category_slug,
         is_published=True
     )
-    post_list = get_list_or_404(
+    posts = get_list_or_404(
         Post.objects.published(),
         category=category
     )
+    paginator = Paginator(posts, INDEX_POST_LIMIT)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     context = {
         'category': category,
-        'post_list': post_list
+        'page_obj': page_obj
     }
     return render(request, template_name, context)
 
 
 class ProfileDetailView(DetailView):
-    """Страница профиля пользователя."""
+    """Страница профиля пользователя с его публикациями."""
     model = User
     template_name = 'blog/profile.html'
     slug_field = 'username'
     slug_url_kwarg = 'username'
     context_object_name = 'profile'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.object
+        posts = Post.objects.filter(author=user)
+        paginator = Paginator(posts, INDEX_POST_LIMIT)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        context['page_obj'] = page_obj
+        return context
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
