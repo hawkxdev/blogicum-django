@@ -3,6 +3,7 @@
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_list_or_404, get_object_or_404, render
 from django.urls import reverse_lazy
@@ -13,14 +14,19 @@ from .models import Category, Post
 User = get_user_model()
 
 # Количество постов отображаемых на главной странице
-INDEX_POST_LIMIT = 5
+INDEX_POST_LIMIT = 10
 
 
 def index(request: HttpRequest) -> HttpResponse:
-    """Главная страница c пятью последними опубликованными постами."""
+    """Главная страница: список опубликованных постов
+    с разбивкой на страницы."""
+    posts = Post.objects.published()
+    paginator = Paginator(posts, INDEX_POST_LIMIT)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     template_name = 'blog/index.html'
     context = {
-        'post_list': Post.objects.published()[:INDEX_POST_LIMIT]
+        'page_obj': page_obj
     }
     return render(request, template_name, context)
 
