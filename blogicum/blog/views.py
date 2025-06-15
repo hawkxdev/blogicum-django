@@ -7,7 +7,7 @@ from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_list_or_404, get_object_or_404, render
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, DetailView
+from django.views.generic import CreateView, DetailView, UpdateView
 
 from .models import Category, Post
 
@@ -64,6 +64,17 @@ def category_posts(request: HttpRequest, category_slug: str) -> HttpResponse:
         'page_obj': page_obj
     }
     return render(request, template_name, context)
+
+
+class ProfileUpdateView(LoginRequiredMixin, UpdateView):
+    """Страница редактирования профиля пользователя."""
+    model = User
+    fields = ('username', 'first_name', 'last_name', 'email')
+    template_name = 'blog/user.html'
+    success_url = reverse_lazy('blog:index')
+
+    def get_object(self):
+        return self.request.user
 
 
 class ProfileDetailView(DetailView):
