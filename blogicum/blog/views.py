@@ -104,7 +104,9 @@ class ProfileDetailView(DetailView):
     def get_context_data(self, **kwargs) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         user = self.object
-        posts = Post.objects.filter(author=user)
+        posts = Post.objects.filter(author=user).annotate(
+            comment_count=Count('comments')
+        ).order_by('-pub_date')
         paginator = Paginator(posts, INDEX_POST_LIMIT)
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
