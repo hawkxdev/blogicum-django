@@ -6,14 +6,16 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_list_or_404, get_object_or_404, render
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views.generic import CreateView, DetailView, UpdateView
+from .forms import PostForm
+from typing import Any
 
 from .models import Category, Post
 
 User = get_user_model()
 
-# Количество постов отображаемых на главной странице
+# Максимальное количество постов на странице
 INDEX_POST_LIMIT = 10
 
 
@@ -85,7 +87,7 @@ class ProfileDetailView(DetailView):
     slug_url_kwarg = 'username'
     context_object_name = 'profile'
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         user = self.object
         posts = Post.objects.filter(author=user)
@@ -99,6 +101,15 @@ class ProfileDetailView(DetailView):
 class PostCreateView(LoginRequiredMixin, CreateView):
     """Страница создания нового поста."""
     model = Post
-    fields = '__all__'
+    form_class = PostForm
     template_name = 'blog/create.html'
-    success_url = reverse_lazy('blog:create_post')
+
+    def form_valid(self, form) -> HttpResponse:
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self) -> str:
+        return reverse(
+            'blog:profile',
+            kwargs={'username': self.request.user.username}
+        )

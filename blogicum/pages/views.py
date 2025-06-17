@@ -16,13 +16,11 @@ class RulesPage(TemplateView):
 
 def csrf_failure(request, reason=''):
     """Обработка ошибки CSRF: подделка межсайтового запроса."""
-    _ = reason
     return render(request, 'pages/403csrf.html', status=403)
 
 
 def page_not_found(request, exception):
     """Обработка ошибки 404: страница не найдена."""
-    _ = exception
     return render(request, 'pages/404.html', status=404)
 
 
