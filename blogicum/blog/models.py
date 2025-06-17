@@ -89,6 +89,7 @@ class Post(PublishedModel):
             'можно делать отложенные публикации.'
         )
     )
+    image = models.ImageField('Изображение', blank=True)
 
     author = models.ForeignKey(User, on_delete=models.CASCADE,
                                verbose_name='Автор публикации')
@@ -113,7 +114,7 @@ class Post(PublishedModel):
 
 class Comment(models.Model):
     """Комментарий к публикации. Может быть оставлен авторизованным пользователем."""
-    
+
     text = models.TextField('Текст комментария')
     created_at = models.DateTimeField('Добавлено', auto_now_add=True)
     author = models.ForeignKey(

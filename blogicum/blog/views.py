@@ -161,22 +161,22 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     """Создание нового комментария к посту. Доступно только
     авторизованным пользователям."""
 
-    post: Post | None = None
+    post_object: Post | None = None
     form_class = CommentForm
 
     def dispatch(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
         """Получает объект поста и сохраняет его в self.post."""
-        self.post = get_object_or_404(Post, pk=kwargs['pk'])
+        self.post_object = get_object_or_404(Post, pk=kwargs['pk'])
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form: CommentForm) -> HttpResponse:
         """Устанавливает автора и пост перед сохранением комментария."""
-        form.instance.post = self.post
+        form.instance.post = self.post_object
         form.instance.author = self.request.user
         return super().form_valid(form)
 
     def get_success_url(self) -> str:
-        return reverse('blog:post_detail', kwargs={'pk': self.post.pk})
+        return reverse('blog:post_detail', kwargs={'pk': self.post_object.pk})
 
 
 class CommentUpdateView(UserPassesTestMixin, UpdateView):
