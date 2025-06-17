@@ -74,7 +74,7 @@ class PostQuerySet(models.QuerySet):
             is_published=True,
             pub_date__lte=timezone.now(),
             category__is_published=True
-        )
+        ).order_by('-pub_date')
 
 
 class Post(PublishedModel):

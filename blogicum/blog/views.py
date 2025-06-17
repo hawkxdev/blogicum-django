@@ -12,7 +12,7 @@ from django.shortcuts import get_list_or_404, get_object_or_404, render
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, UpdateView
 from django.utils.timezone import now
-from django.db.models import Q
+from django.db.models import Count
 
 from .forms import CommentForm, PostForm
 from .models import Category, Comment, Post
@@ -26,7 +26,7 @@ INDEX_POST_LIMIT = 10
 def index(request: HttpRequest) -> HttpResponse:
     """Главная страница: список опубликованных постов
     с разбивкой на страницы."""
-    posts = Post.objects.published()
+    posts = Post.objects.published().annotate(comment_count=Count('comments'))
     paginator = Paginator(posts, INDEX_POST_LIMIT)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
