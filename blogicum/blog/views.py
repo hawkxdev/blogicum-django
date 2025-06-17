@@ -7,10 +7,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import AbstractBaseUser
 from django.core.paginator import Paginator
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_list_or_404, get_object_or_404, render
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, UpdateView
+from django.utils.timezone import now
+from django.db.models import Q
 
 from .forms import CommentForm, PostForm
 from .models import Category, Comment, Post
@@ -38,10 +40,12 @@ def index(request: HttpRequest) -> HttpResponse:
 def post_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Страница поста по идентификатору."""
     template_name = 'blog/detail.html'
-    post = get_object_or_404(
-        Post.objects.published(),
-        pk=pk
-    )
+    post = get_object_or_404(Post, pk=pk)
+
+    if not post.is_published or post.pub_date > now():
+        if post.author != request.user:
+            raise Http404
+
     form = CommentForm()
     context = {
         'post': post,
@@ -58,10 +62,9 @@ def category_posts(request: HttpRequest, category_slug: str) -> HttpResponse:
         slug=category_slug,
         is_published=True
     )
-    posts = get_list_or_404(
-        Post.objects.published(),
-        category=category
-    )
+    # Не используем get_list_or_404 так как нужна страница даже без постов
+    posts = Post.objects.published().filter(category=category)
+
     paginator = Paginator(posts, INDEX_POST_LIMIT)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -185,3 +188,12 @@ class CommentUpdateView(UserPassesTestMixin, UpdateView):
         """Проверяет, что пользователь - автор комментария."""
         comment = self.get_object()
         return comment.author == self.request.user
+
+
+class CommentDeleteView(UserPassesTestMixin, DeleteView):
+    """Страница удаления комментария. Доступна только автору."""
+
+    model = Comment
+
+    def get_success_url(self) -> str:
+        return reverse('blog:post_detail', kwargs={'pk': self.post.pk})
