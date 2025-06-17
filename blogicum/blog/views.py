@@ -1,5 +1,6 @@
 """View-функции и классы для отображения главной страницы, постов,
-категорий и профиля пользователя."""
+категорий и профиля пользователя.
+"""
 
 from typing import Any
 
@@ -26,7 +27,8 @@ INDEX_POST_LIMIT = 10
 
 def index(request: HttpRequest) -> HttpResponse:
     """Главная страница: список опубликованных постов
-    с разбивкой на страницы."""
+    с разбивкой на страницы.
+    """
     posts = Post.objects.published().annotate(comment_count=Count('comments'))
     paginator = Paginator(posts, INDEX_POST_LIMIT)
 
@@ -81,7 +83,8 @@ def category_posts(request: HttpRequest, category_slug: str) -> HttpResponse:
 
 class RedirectToPostMixin:
     """Миксин для перенаправления на страницу публикации
-    при отсутствии доступа."""
+    при отсутствии доступа.
+    """
 
     def handle_no_permission(self) -> HttpResponseRedirect:
         return HttpResponseRedirect(
@@ -181,7 +184,8 @@ class PostDeleteView(RedirectToPostMixin, AuthorRequiredMixin, DeleteView):
 
 class CommentCreateView(LoginRequiredMixin, CreateView):
     """Создание нового комментария к посту доступно только
-    авторизованным пользователям."""
+    авторизованным пользователям.
+    """
 
     post_object: Post | None = None
     form_class = CommentForm

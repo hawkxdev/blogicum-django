@@ -113,7 +113,7 @@ class Post(PublishedModel):
 
 
 class Comment(models.Model):
-    """Комментарий к публикации. Может быть оставлен авторизованным пользователем."""
+    """Комментарий к публикации."""
 
     text = models.TextField('Текст комментария')
     created_at = models.DateTimeField('Добавлено', auto_now_add=True)
