@@ -7,12 +7,13 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import AbstractBaseUser
 from django.core.paginator import Paginator
-from django.http import Http404, HttpRequest, HttpResponse
-from django.shortcuts import get_list_or_404, get_object_or_404, render
-from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, UpdateView
-from django.utils.timezone import now
 from django.db.models import Count
+from django.http import (Http404, HttpRequest, HttpResponse,
+                         HttpResponseRedirect)
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse, reverse_lazy
+from django.utils import timezone
+from django.views.generic import CreateView, DeleteView, DetailView, UpdateView
 
 from .forms import CommentForm, PostForm
 from .models import Category, Comment, Post
@@ -28,26 +29,26 @@ def index(request: HttpRequest) -> HttpResponse:
     с разбивкой на страницы."""
     posts = Post.objects.published().annotate(comment_count=Count('comments'))
     paginator = Paginator(posts, INDEX_POST_LIMIT)
+
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    template_name = 'blog/index.html'
+
     context = {
         'page_obj': page_obj
     }
-    return render(request, template_name, context)
+    return render(request, 'blog/index.html', context)
 
 
 def post_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Страница поста по идентификатору."""
-    template_name = 'blog/detail.html'
     post = get_object_or_404(Post, pk=pk)
 
-    if not post.is_published or post.pub_date > now():
-        if post.author != request.user:
-            raise Http404
+    if ((not post.is_published or post.pub_date > timezone.now()
+         or not post.category.is_published)
+            and post.author != request.user):
+        raise Http404
 
     form = CommentForm()
-
     comments = post.comments.select_related('author')
 
     context = {
@@ -55,28 +56,44 @@ def post_detail(request: HttpRequest, pk: int) -> HttpResponse:
         'form': form,
         'comments': comments,
     }
-    return render(request, template_name, context)
+    return render(request, 'blog/detail.html', context)
 
 
 def category_posts(request: HttpRequest, category_slug: str) -> HttpResponse:
     """Список постов выбранной категории."""
-    template_name = 'blog/category.html'
     category = get_object_or_404(
         Category,
         slug=category_slug,
         is_published=True
     )
-    # Не используем get_list_or_404 так как нужна страница даже без постов
     posts = Post.objects.published().filter(category=category)
-
     paginator = Paginator(posts, INDEX_POST_LIMIT)
+
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
     context = {
         'category': category,
         'page_obj': page_obj
     }
-    return render(request, template_name, context)
+    return render(request, 'blog/category.html', context)
+
+
+class RedirectToPostMixin:
+    """Миксин для перенаправления на страницу публикации
+    при отсутствии доступа."""
+
+    def handle_no_permission(self) -> HttpResponseRedirect:
+        return HttpResponseRedirect(
+            reverse('blog:post_detail', kwargs={'pk': self.get_object().pk})
+        )
+
+
+class AuthorRequiredMixin(UserPassesTestMixin):
+    """Миксин для проверки что пользователь автор объекта."""
+
+    def test_func(self) -> bool:
+        return self.get_object().author == self.request.user
 
 
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
@@ -108,8 +125,10 @@ class ProfileDetailView(DetailView):
             comment_count=Count('comments')
         ).order_by('-pub_date')
         paginator = Paginator(posts, INDEX_POST_LIMIT)
+
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
+
         context['page_obj'] = page_obj
         return context
 
@@ -133,15 +152,12 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         )
 
 
-class PostUpdateView(UserPassesTestMixin, UpdateView):
-    """Страница редактирования поста. Доступна только автору поста."""
+class PostUpdateView(RedirectToPostMixin, AuthorRequiredMixin, UpdateView):
+    """Страница редактирования поста доступна только автору."""
 
     model = Post
     form_class = PostForm
-
-    def test_func(self) -> bool | None:
-        post = self.get_object()
-        return post.author == self.request.user
+    template_name = 'blog/create.html'
 
     def get_success_url(self) -> str:
         post = self.object
@@ -151,8 +167,8 @@ class PostUpdateView(UserPassesTestMixin, UpdateView):
         )
 
 
-class PostDeleteView(UserPassesTestMixin, DeleteView):
-    """Страница удаления поста. Доступна только автору поста."""
+class PostDeleteView(RedirectToPostMixin, AuthorRequiredMixin, DeleteView):
+    """Страница удаления поста доступна только автору."""
 
     model = Post
 
@@ -164,7 +180,7 @@ class PostDeleteView(UserPassesTestMixin, DeleteView):
 
 
 class CommentCreateView(LoginRequiredMixin, CreateView):
-    """Создание нового комментария к посту. Доступно только
+    """Создание нового комментария к посту доступно только
     авторизованным пользователям."""
 
     post_object: Post | None = None
@@ -185,21 +201,22 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
         return reverse('blog:post_detail', kwargs={'pk': self.post_object.pk})
 
 
-class CommentUpdateView(UserPassesTestMixin, UpdateView):
-    """Редактирование комментария. Доступно только автору комментария."""
+class CommentUpdateView(RedirectToPostMixin, AuthorRequiredMixin, UpdateView):
+    """Редактирование комментария доступно только автору."""
 
     model = Comment
+    template_name = 'blog/comment.html'
+    form_class = CommentForm
 
-    def test_func(self) -> bool:
-        """Проверяет, что пользователь - автор комментария."""
-        comment = self.get_object()
-        return comment.author == self.request.user
+    def get_success_url(self) -> str:
+        return reverse('blog:post_detail', kwargs={'pk': self.object.post.pk})
 
 
-class CommentDeleteView(UserPassesTestMixin, DeleteView):
-    """Страница удаления комментария. Доступна только автору."""
+class CommentDeleteView(RedirectToPostMixin, AuthorRequiredMixin, DeleteView):
+    """Удаление комментария доступно только автору."""
 
     model = Comment
+    template_name = 'blog/comment.html'
 
     def get_success_url(self) -> str:
         return reverse('blog:post_detail', kwargs={'pk': self.object.post.pk})
