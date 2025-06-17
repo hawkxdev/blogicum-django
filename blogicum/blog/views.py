@@ -47,9 +47,13 @@ def post_detail(request: HttpRequest, pk: int) -> HttpResponse:
             raise Http404
 
     form = CommentForm()
+
+    comments = post.comments.select_related('author')
+
     context = {
         'post': post,
         'form': form,
+        'comments': comments,
     }
     return render(request, template_name, context)
 
@@ -165,7 +169,7 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     form_class = CommentForm
 
     def dispatch(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
-        """Получает объект поста и сохраняет его в self.post."""
+        """Получает объект поста и сохраняет его в self.post_object."""
         self.post_object = get_object_or_404(Post, pk=kwargs['pk'])
         return super().dispatch(request, *args, **kwargs)
 
@@ -196,4 +200,4 @@ class CommentDeleteView(UserPassesTestMixin, DeleteView):
     model = Comment
 
     def get_success_url(self) -> str:
-        return reverse('blog:post_detail', kwargs={'pk': self.post.pk})
+        return reverse('blog:post_detail', kwargs={'pk': self.object.post.pk})
