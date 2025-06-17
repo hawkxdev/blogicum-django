@@ -69,7 +69,7 @@ class PostQuerySet(models.QuerySet):
     и датой публикации не позже текущего времени.
     """
 
-    def published(self):
+    def published(self) -> models.QuerySet:
         return self.filter(
             is_published=True,
             pub_date__lte=timezone.now(),
@@ -109,3 +109,30 @@ class Post(PublishedModel):
 
     def __str__(self) -> str:
         return self.title
+
+
+class Comment(models.Model):
+    """Комментарий к публикации. Может быть оставлен авторизованным пользователем."""
+    
+    text = models.TextField('Текст комментария')
+    created_at = models.DateTimeField('Добавлено', auto_now_add=True)
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        verbose_name='Автор комментария',
+        related_name='comments'
+    )
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        verbose_name='Публикация',
+        related_name='comments'
+    )
+
+    class Meta:
+        verbose_name = 'комментарий'
+        verbose_name_plural = 'Комментарии'
+        ordering = ('-created_at',)
+
+    def __str__(self) -> str:
+        return self.text[:20]

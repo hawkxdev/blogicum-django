@@ -6,11 +6,13 @@ from django.views.generic import TemplateView
 
 class AboutPage(TemplateView):
     """Отображает статическую страницу "О проекте"."""
+
     template_name = 'pages/about.html'
 
 
 class RulesPage(TemplateView):
     """Отображает статическую страницу "Правила"."""
+
     template_name = 'pages/rules.html'
 
 

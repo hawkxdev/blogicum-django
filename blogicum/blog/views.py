@@ -1,17 +1,19 @@
 """View-функции и классы для отображения главной страницы, постов,
 категорий и профиля пользователя."""
 
+from typing import Any
+
 from django.contrib.auth import get_user_model
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.models import AbstractBaseUser
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_list_or_404, get_object_or_404, render
-from django.urls import reverse_lazy, reverse
-from django.views.generic import CreateView, DetailView, UpdateView
-from .forms import PostForm
-from typing import Any
+from django.urls import reverse, reverse_lazy
+from django.views.generic import CreateView, DeleteView, DetailView, UpdateView
 
-from .models import Category, Post
+from .forms import CommentForm, PostForm
+from .models import Category, Comment, Post
 
 User = get_user_model()
 
@@ -40,8 +42,10 @@ def post_detail(request: HttpRequest, pk: int) -> HttpResponse:
         Post.objects.published(),
         pk=pk
     )
+    form = CommentForm()
     context = {
-        'post': post
+        'post': post,
+        'form': form,
     }
     return render(request, template_name, context)
 
@@ -70,17 +74,20 @@ def category_posts(request: HttpRequest, category_slug: str) -> HttpResponse:
 
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     """Страница редактирования профиля пользователя."""
+
     model = User
     fields = ('username', 'first_name', 'last_name', 'email')
     template_name = 'blog/user.html'
     success_url = reverse_lazy('blog:index')
 
-    def get_object(self):
+    def get_object(self) -> AbstractBaseUser:
+        """Возвращает текущего пользователя для редактирования."""
         return self.request.user
 
 
 class ProfileDetailView(DetailView):
     """Страница профиля пользователя с его публикациями."""
+
     model = User
     template_name = 'blog/profile.html'
     slug_field = 'username'
@@ -100,11 +107,13 @@ class ProfileDetailView(DetailView):
 
 class PostCreateView(LoginRequiredMixin, CreateView):
     """Страница создания нового поста."""
+
     model = Post
     form_class = PostForm
     template_name = 'blog/create.html'
 
-    def form_valid(self, form) -> HttpResponse:
+    def form_valid(self, form: PostForm) -> HttpResponse:
+        """Устанавливает автора поста перед сохранением."""
         form.instance.author = self.request.user
         return super().form_valid(form)
 
@@ -113,3 +122,66 @@ class PostCreateView(LoginRequiredMixin, CreateView):
             'blog:profile',
             kwargs={'username': self.request.user.username}
         )
+
+
+class PostUpdateView(UserPassesTestMixin, UpdateView):
+    """Страница редактирования поста. Доступна только автору поста."""
+
+    model = Post
+    form_class = PostForm
+
+    def test_func(self) -> bool | None:
+        post = self.get_object()
+        return post.author == self.request.user
+
+    def get_success_url(self) -> str:
+        post = self.object
+        return reverse(
+            'blog:post_detail',
+            kwargs={'pk': post.pk}
+        )
+
+
+class PostDeleteView(UserPassesTestMixin, DeleteView):
+    """Страница удаления поста. Доступна только автору поста."""
+
+    model = Post
+
+    def get_success_url(self) -> str:
+        return reverse(
+            'blog:profile',
+            kwargs={'username': self.request.user.username}
+        )
+
+
+class CommentCreateView(LoginRequiredMixin, CreateView):
+    """Создание нового комментария к посту. Доступно только
+    авторизованным пользователям."""
+
+    post: Post | None = None
+    form_class = CommentForm
+
+    def dispatch(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+        """Получает объект поста и сохраняет его в self.post."""
+        self.post = get_object_or_404(Post, pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form: CommentForm) -> HttpResponse:
+        """Устанавливает автора и пост перед сохранением комментария."""
+        form.instance.post = self.post
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self) -> str:
+        return reverse('blog:post_detail', kwargs={'pk': self.post.pk})
+
+
+class CommentUpdateView(UserPassesTestMixin, UpdateView):
+    """Редактирование комментария. Доступно только автору комментария."""
+
+    model = Comment
+
+    def test_func(self) -> bool:
+        """Проверяет, что пользователь - автор комментария."""
+        comment = self.get_object()
+        return comment.author == self.request.user

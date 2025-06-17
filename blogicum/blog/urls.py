@@ -1,7 +1,9 @@
 from django.urls import path
 
 from . import views
-from .views import PostCreateView, ProfileDetailView, ProfileUpdateView
+from .views import (CommentCreateView, CommentUpdateView, PostCreateView,
+                    PostDeleteView, PostUpdateView, ProfileDetailView,
+                    ProfileUpdateView)
 
 app_name = 'blog'
 
@@ -11,6 +13,26 @@ urlpatterns = [
         'posts/create/',
         PostCreateView.as_view(),
         name='create_post'
+    ),
+    path(
+        'posts/<int:pk>/edit/',
+        PostUpdateView.as_view(),
+        name='edit_post'
+    ),
+    path(
+        'posts/<int:pk>/delete/',
+        PostDeleteView.as_view(),
+        name='delete_post'
+    ),
+    path(
+        'posts/<int:pk>/comment/',
+        CommentCreateView.as_view(),
+        name='add_comment'
+    ),
+    path(
+        'posts/<int:pk>/edit_comment/<int:comment_id>/',
+        CommentUpdateView.as_view(),
+        name='edit_comment'
     ),
     path(
         'posts/<int:pk>/',
