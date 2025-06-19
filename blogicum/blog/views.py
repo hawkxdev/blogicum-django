@@ -7,15 +7,14 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import AbstractBaseUser
-from django.core.paginator import Paginator, Page
-from django.db.models import Count
+from django.core.paginator import Page, Paginator
+from django.db.models import Count, QuerySet
 from django.http import (Http404, HttpRequest, HttpResponse,
                          HttpResponseRedirect)
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, DetailView, UpdateView
-from django.db.models import QuerySet
 
 from .forms import CommentForm, PostForm
 from .models import Category, Comment, Post
@@ -172,6 +171,15 @@ class PostDeleteView(RedirectToPostMixin, AuthorRequiredMixin, DeleteView):
     """Страница удаления поста доступна только автору."""
 
     model = Post
+    template_name = 'blog/create.html'
+
+    def get_context_data(self, **kwargs) -> dict[str, Any]:
+        """Добавляет в контекст форму с постом для отображения в шаблоне
+        через form.instance.
+        """
+        context = super().get_context_data(**kwargs)
+        context['form'] = PostForm(instance=self.object)
+        return context
 
     def get_success_url(self) -> str:
         return reverse(
@@ -210,6 +218,12 @@ class CommentUpdateView(RedirectToPostMixin, AuthorRequiredMixin, UpdateView):
     template_name = 'blog/comment.html'
     form_class = CommentForm
 
+    def get_object(self) -> Comment:
+        """Возвращает объект комментария по идентификатору comment_pk
+        переданному в URL.
+        """
+        return get_object_or_404(Comment, pk=self.kwargs['comment_pk'])
+
     def get_success_url(self) -> str:
         return reverse('blog:post_detail', kwargs={'pk': self.object.post.pk})
 
@@ -219,6 +233,12 @@ class CommentDeleteView(RedirectToPostMixin, AuthorRequiredMixin, DeleteView):
 
     model = Comment
     template_name = 'blog/comment.html'
+
+    def get_object(self) -> Comment:
+        """Возвращает объект комментария по идентификатору comment_pk
+        переданному в URL.
+        """
+        return get_object_or_404(Comment, pk=self.kwargs['comment_pk'])
 
     def get_success_url(self) -> str:
         return reverse('blog:post_detail', kwargs={'pk': self.object.post.pk})
