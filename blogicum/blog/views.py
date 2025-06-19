@@ -7,7 +7,7 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import AbstractBaseUser
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, Page
 from django.db.models import Count
 from django.http import (Http404, HttpRequest, HttpResponse,
                          HttpResponseRedirect)
@@ -15,6 +15,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, DetailView, UpdateView
+from django.db.models import QuerySet
 
 from .forms import CommentForm, PostForm
 from .models import Category, Comment, Post
@@ -25,16 +26,19 @@ User = get_user_model()
 INDEX_POST_LIMIT = 10
 
 
+def get_paginator(posts: QuerySet[Post], request: HttpRequest) -> Page:
+    """Разбивает посты на страницы и возвращает текущую страницу."""
+    paginator = Paginator(posts, INDEX_POST_LIMIT)
+    page_number = request.GET.get('page')
+    return paginator.get_page(page_number)
+
+
 def index(request: HttpRequest) -> HttpResponse:
     """Главная страница: список опубликованных постов
     с разбивкой на страницы.
     """
     posts = Post.objects.published().annotate(comment_count=Count('comments'))
-    paginator = Paginator(posts, INDEX_POST_LIMIT)
-
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
+    page_obj = get_paginator(posts, request)
     context = {
         'page_obj': page_obj
     }
@@ -69,10 +73,7 @@ def category_posts(request: HttpRequest, category_slug: str) -> HttpResponse:
         is_published=True
     )
     posts = Post.objects.published().filter(category=category)
-    paginator = Paginator(posts, INDEX_POST_LIMIT)
-
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginator(posts, request)
 
     context = {
         'category': category,
@@ -127,10 +128,7 @@ class ProfileDetailView(DetailView):
         posts = Post.objects.filter(author=user).annotate(
             comment_count=Count('comments')
         ).order_by('-pub_date')
-        paginator = Paginator(posts, INDEX_POST_LIMIT)
-
-        page_number = self.request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
+        page_obj = get_paginator(posts, self.request)
 
         context['page_obj'] = page_obj
         return context
